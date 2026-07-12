@@ -1,0 +1,10 @@
+# 构建产物
+*.zip
+phpdesktop/
+baiduwp-php/
+temp_src/
+
+# IDE
+.vscode/
+.idea/
+*.iml
