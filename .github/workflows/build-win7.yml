@@ -1,0 +1,104 @@
+name: Build Win7 EXE Package
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout builder repo
+        uses: actions/checkout@v4
+
+      - name: Download PHP Desktop Chrome 57
+        shell: powershell
+        run: |
+          $sfUrl = "https://sourceforge.net/projects/phpdesktop.mirror/files/chrome-v57.0-rc/phpdesktop-chrome-57.0-rc-php-7.1.3.zip/download"
+          $fallbackUrl = "https://github.com/cztomczak/phpdesktop/releases/download/v57.0-rc/phpdesktop-chrome-57.0-rc-php-7.1.3.zip"
+          try {
+            Write-Host "尝试从 SourceForge 下载..."
+            Invoke-WebRequest -Uri $sfUrl -OutFile "phpdesktop.zip" -MaximumRedirection 10 -TimeoutSec 120
+          } catch {
+            Write-Host "SourceForge 失败，尝试 GitHub 镜像..."
+            Invoke-WebRequest -Uri $fallbackUrl -OutFile "phpdesktop.zip" -TimeoutSec 120
+          }
+          Expand-Archive -Path "phpdesktop.zip" -DestinationPath ".\phpdesktop" -Force
+          Remove-Item "phpdesktop.zip"
+          Write-Host "PHP Desktop 下载并解压完成"
+
+      - name: Download baiduwp-php source
+        shell: powershell
+        run: |
+          $zipUrl = "https://github.com/yuantuo666/baiduwp-php/archive/refs/heads/master.zip"
+          Invoke-WebRequest -Uri $zipUrl -OutFile "baiduwp.zip" -TimeoutSec 120
+          Expand-Archive -Path "baiduwp.zip" -DestinationPath ".\temp_src" -Force
+          Remove-Item "baiduwp.zip"
+          $subDir = Get-ChildItem -Path ".\temp_src" -Directory | Select-Object -First 1
+          if ($subDir) {
+            Move-Item -Path $subDir.FullName -Destination ".\baiduwp-php" -Force
+          }
+          Remove-Item -Path ".\temp_src" -Recurse -Force
+          Write-Host "baiduwp-php 源码下载完成"
+
+      - name: Merge into PHP Desktop
+        shell: powershell
+        run: |
+          if (Test-Path ".\phpdesktop\www") {
+            Remove-Item -Path ".\phpdesktop\www" -Recurse -Force
+          }
+          Move-Item -Path ".\baiduwp-php" -Destination ".\phpdesktop\www" -Force
+          Copy-Item -Path ".\assets\settings.json" -Destination ".\phpdesktop\settings.json" -Force
+          $phpIni = ".\phpdesktop\php\php.ini"
+          if (Test-Path $phpIni) {
+            $content = Get-Content $phpIni -Raw
+            $content = $content -replace ';extension=php_curl.dll', 'extension=php_curl.dll'
+            $content = $content -replace ';extension=php_openssl.dll', 'extension=php_openssl.dll'
+            $content = $content -replace ';extension=php_mbstring.dll', 'extension=php_mbstring.dll'
+            $content | Set-Content $phpIni -NoNewline
+          }
+          Write-Host "合并完成"
+
+      - name: Package ZIP
+        shell: powershell
+        run: |
+          $version = "${{ github.ref_name }}"
+          if ($version -eq "" -or $version -eq "refs/heads/main") {
+            $version = "nightly"
+          }
+          $zipName = "baiduwp-php-win7-x86-$version.zip"
+          Compress-Archive -Path ".\phpdesktop\*" -DestinationPath ".\$zipName" -Force
+          Write-Host "打包完成: $zipName"
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: baiduwp-php-win7-exe
+          path: baiduwp-php-win7-x86-*.zip
+
+      - name: Release to GitHub
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: baiduwp-php-win7-x86-*.zip
+          name: BaiduWP PHP Win7 EXE ${{ github.ref_name }}
+          body: |
+            ## 百度网盘解析工具 - Win7 桌面版
+
+            ### 系统要求
+            - Windows 7 SP1 或更高版本（32/64位）
+            - [Visual C++ Redistributable for VS 2015 (x86)](https://www.microsoft.com/download/details.aspx?id=48145)
+
+            ### 使用方法
+            1. 下载 ZIP 并解压到任意目录
+            2. 双击运行 `phpdesktop.exe`
+
+            ### 配置说明
+            首次运行后，请在程序目录下找到 `www/config.php` 进行 SVIP Cookie 配置。
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
