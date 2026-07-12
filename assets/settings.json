@@ -1,6 +1,6 @@
 {
   "main_window": {
-    "title": "百度网盘解析工具",
+    "title": "BaiduWP PHP - PanDownload",
     "default_width": 1200,
     "default_height": 800,
     "minimum_width": 800,
@@ -11,7 +11,7 @@
   },
   "web_server": {
     "listen_on": "127.0.0.1:0",
-    "document_root": "www",
+    "document_root": "www/public",
     "directory_index": "index.php"
   },
   "chrome": {
