@@ -1,0 +1,22 @@
+{
+  "main_window": {
+    "title": "百度网盘解析工具",
+    "default_width": 1200,
+    "default_height": 800,
+    "minimum_width": 800,
+    "minimum_height": 600,
+    "center_screen": true,
+    "show_statusbar": false,
+    "disable_dev_tools": true
+  },
+  "web_server": {
+    "listen_on": "127.0.0.1:0",
+    "document_root": "www",
+    "directory_index": "index.php"
+  },
+  "chrome": {
+    "cache_path": "webcache",
+    "log_file": "debug.log",
+    "remote_debugging_port": 0
+  }
+}
